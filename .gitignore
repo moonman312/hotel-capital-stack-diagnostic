@@ -1,0 +1,12 @@
+# dependencies (test-only; not needed to run or deploy the site)
+node_modules/
+package-lock.json
+
+# os / editor
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# vercel
+.vercel

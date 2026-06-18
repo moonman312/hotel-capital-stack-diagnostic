@@ -1,0 +1,14 @@
+{
+  "name": "hotel-capital-stack-diagnostic",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Confidential hotel debt-service & capital-stack diagnostic by Modern Hospitality Solutions. Static, client-side, no backend.",
+  "scripts": {
+    "test": "node engine.test.js && node smoke.test.js",
+    "test:engine": "node engine.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  },
+  "license": "UNLICENSED"
+}
