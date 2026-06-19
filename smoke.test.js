@@ -44,8 +44,8 @@ function lastNavButton(){
 // Try to fill every known field if its section is currently visible.
 function fillVisible(){
   const data = {
-    rooms:"120", ptype:"Select-service",
-    noi:"1500000", noiBasis:"Yes — fee and reserve removed", occ:"72", adr:"165",
+    rooms:"120", ptype:"Self-check-in / no front desk",
+    noi:"1500000", totalRevenue:"6000000", noiBasis:"Yes — fee and reserve removed", occ:"72", adr:"165",
     marketPosition:"Below comp set (room to grow)", noiTrend:"Flat",
     loanBalance:"18000000", rate:"7.25", floating:"Fixed", amort:"25", maturity:"2027-03-01",
     value:"20000000", prefBalance:"3000000", lenderType:"CMBS", recourse:"Non-recourse",
@@ -114,6 +114,12 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const loanType = Array.from(document.querySelectorAll("h3")).some(h=>/loan type: CMBS/i.test(h.textContent));
     loanType ? pass("loan-type (CMBS) good/risk/tactics present") : fail("loan-type card");
 
+    // self-check-in property type: margin reasonableness callout + type-based flow-through
+    const marginCheck = Array.from(document.querySelectorAll(".callout")).some(c=>/NOI margin check/i.test(c.textContent));
+    marginCheck ? pass("NOI margin reasonableness check fires for self-check-in type") : fail("margin check callout");
+    const flowAdj = /Flow-through defaults adjusted/i.test(document.body.textContent);
+    flowAdj ? pass("type-based flow-through defaults applied (self-check-in)") : fail("type-based flow-through note");
+
     // Cash-after-debt metric present (plain dollars, /yr)
     const metricVals = Array.from(document.querySelectorAll(".metric .val")).map(v=>v.textContent);
     metricVals.some(v=>/\/yr/.test(v)) ? pass("cash-after-debt metric shown: "+metricVals[0]) : fail("cash metric", metricVals.join("|"));
@@ -149,10 +155,15 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const sliderLabels = Array.from(document.querySelectorAll(".slider label")).map(l=>l.textContent).join("|");
     /Shift OTA/.test(sliderLabels)&&/Cut OTA commission/.test(sliderLabels) ? pass("distribution sliders present") : fail("distribution sliders", sliderLabels);
 
-    // Expert mode adds the assumptions step (7 total)
+    // Expert mode collapses to a single dense input page + results (2 steps)
     document.querySelector('#modeswitch button[data-mode="expert"]').click();
     const expSteps = document.querySelectorAll(".stepper .s").length;
-    expSteps===8 ? pass("expert flow has 8 steps (with assumptions)") : fail("expert step count", expSteps);
+    expSteps===2 ? pass("expert flow is one dense input page + results (2 steps)") : fail("expert step count", expSteps);
+    // expert uses terse labels (e.g., "NOI ($/yr)") and still shows help text
+    const expLabels = Array.from(document.querySelectorAll(".field label")).map(l=>l.textContent);
+    expLabels.includes("NOI ($/yr)") ? pass("expert shows terse labels") : fail("expert terse labels", expLabels.slice(0,6).join("|"));
+    const helpKept = document.querySelectorAll(".field .help").length > 0;
+    helpKept ? pass("help text kept in expert mode") : fail("help kept in expert");
 
     // Privacy modal
     document.getElementById("privacyBtn").click();

@@ -4,6 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Hotel Capital Stack Diagnostic — MHS</title>
+<link rel="icon" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'><rect%20x='7'%20y='5'%20width='18'%20height='23'%20rx='1.5'%20fill='none'%20stroke='%231f8a8a'%20stroke-width='2'/><line%20x1='4.5'%20y1='28'%20x2='27.5'%20y2='28'%20stroke='%231f8a8a'%20stroke-width='2'%20stroke-linecap='round'/><line%20x1='10.5'%20y1='9'%20x2='13'%20y2='9'%20stroke='%231f8a8a'%20stroke-width='2'%20stroke-linecap='round'/><line%20x1='19'%20y1='9'%20x2='21.5'%20y2='9'%20stroke='%231f8a8a'%20stroke-width='2'%20stroke-linecap='round'/><text%20x='16'%20y='22.5'%20text-anchor='middle'%20font-family='Georgia,serif'%20font-weight='bold'%20font-size='15'%20fill='%231f8a8a'>$</text></svg>" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'><rect%20x='7'%20y='5'%20width='18'%20height='23'%20rx='1.5'%20fill='none'%20stroke='%231f8a8a'%20stroke-width='2'/><line%20x1='4.5'%20y1='28'%20x2='27.5'%20y2='28'%20stroke='%231f8a8a'%20stroke-width='2'%20stroke-linecap='round'/><text%20x='16'%20y='22.5'%20text-anchor='middle'%20font-family='Georgia,serif'%20font-weight='bold'%20font-size='15'%20fill='%231f8a8a'>$</text></svg>" />
 <style>
 :root{
   --navy:#0e2a3b; --navy-2:#143b52; --teal:#1f8a8a; --teal-2:#13b3a6;
@@ -39,9 +41,10 @@ a{color:var(--teal)}
 /* top bar */
 header.topbar{background:var(--navy);color:#fff;position:sticky;top:0;z-index:50}
 .topbar .wrap{display:flex;align-items:center;gap:16px;height:60px}
-.logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.02em}
-.logo .mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--teal-2),var(--teal));display:grid;place-items:center;font-size:15px;color:#04201f;font-weight:900}
-.logo small{display:block;font-weight:500;font-size:11px;color:#9fc4c4;letter-spacing:.06em}
+.logo{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.01em}
+.logo .mark{width:30px;height:30px;display:grid;place-items:center}
+.logo .mark svg{width:30px;height:30px;display:block}
+.logo .name{font-size:15px;font-weight:700;color:#fff;letter-spacing:.01em}
 .topbar .spacer{flex:1}
 .topbar .privacy{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#bcd6d6}
 .topbar .privacy .dot{width:8px;height:8px;border-radius:50%;background:var(--teal-2)}
@@ -149,7 +152,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 <body>
 <header class="topbar">
   <div class="wrap">
-    <div class="logo"><span class="mark">M</span><div>MHS<small>Capital Stack Diagnostic</small></div></div>
+    <div class="logo"><span class="mark"><svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g fill="none" stroke="#13b3a6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="5" width="18" height="23" rx="1.5"/><line x1="4.5" y1="28" x2="27.5" y2="28"/><line x1="10.5" y1="8.7" x2="13" y2="8.7"/><line x1="19" y1="8.7" x2="21.5" y2="8.7"/></g><text x="16" y="22.5" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-weight="bold" font-size="15" fill="#13b3a6">$</text></svg></span><span class="name">Capital Stack Diagnostic</span></div>
     <div class="spacer"></div>
     <div class="modeswitch" id="modeswitch">
       <button data-mode="quick">Quick</button>

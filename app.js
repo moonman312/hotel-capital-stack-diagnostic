@@ -18,6 +18,22 @@ var DEF = {
   flowThrough: 55, adrFlow: 90, occFlow: 65, refiCostPct: 1.5, directCost: 7
 };
 
+/* Per-property-type flow-through defaults (used only when distribution actuals aren't given).
+   A staffless / self-check-in model has a much leaner fixed-labor base, so more of each
+   incremental revenue dollar reaches NOI. */
+var FLOW_DEFAULTS={
+  _default:{blended:55,adr:90,occ:65},
+  "Self-check-in / no front desk":{blended:70,adr:92,occ:80},
+  "Extended-stay":{blended:60,adr:90,occ:70}
+};
+
+/* Typical NOI-margin bands by property type, for a reasonableness check. */
+var MARGIN_BANDS={
+  _default:[15,55],
+  "Full-service":[18,30], "Select-service":[30,42], "Resort":[18,32],
+  "Boutique":[22,36], "Extended-stay":[35,48], "Self-check-in / no front desk":[45,62], "Other":[18,45]
+};
+
 /* ---------- state ---------- */
 var S = { mode: "beginner", anon: false, step: 0, propertyName: "", f: {} };
 
@@ -28,7 +44,7 @@ var S = { mode: "beginner", anon: false, step: 0, propertyName: "", f: {} };
 var FIELDS = {
   // property
   rooms:        {label:"How many guest rooms does the property have?", help:"Total keys.", kind:"num", sensitive:false, section:"property", weight:1},
-  ptype:        {label:"Property type", kind:"select", section:"property", opts:["Select-service","Full-service","Resort","Boutique","Extended-stay","Other"], sensitive:false, weight:0.5},
+  ptype:        {label:"Property type", help:"Pick the closest. “Self-check-in / no front desk” covers staffless / contactless / remotely-managed boutique and lifestyle properties.", kind:"select", section:"property", opts:["Select-service","Full-service","Resort","Boutique","Extended-stay","Self-check-in / no front desk","Other"], sensitive:false, weight:0.5},
   branded:      {label:"Branded or independent?", kind:"select", section:"property", opts:["Branded (flag)","Independent"], sensitive:false, weight:0.5},
   mgmt:         {label:"Who operates it?", kind:"select", section:"property", opts:["Owner-operated","Third-party managed"], sensitive:false, weight:0.5},
   objective:    {label:"Current ownership objective", kind:"select", section:"property", opts:["Hold long-term","Refinance soon","Sell within 1–2 yrs","Stabilize / fix performance","Undecided"], sensitive:false, weight:0.5},
@@ -94,11 +110,12 @@ var STEP = {
   capex:       {key:"capex",      title:"Capital & cash",sub:"Capital needs, reserves, and what you could inject if needed."},
   distribution:{key:"distribution",title:"Distribution",sub:"How you sell rooms and what each room costs. All optional — this powers the fix simulation."},
   assumptions: {key:"assumptions",title:"Assumptions",  sub:"Refinance assumptions. Leave blank to use conservative ranges."},
-  results:     {key:"results",    title:"Results",      sub:""}
+  results:     {key:"results",    title:"Results",      sub:""},
+  inputs:      {key:"inputs",     title:"Inputs",       sub:""}
 };
 function getSteps(){
+  if(S.mode==="expert") return [STEP.inputs, STEP.results];   // one dense page, then results
   var s=[STEP.property, STEP.operating, STEP.debt, STEP.stack, STEP.capex, STEP.distribution];
-  if(S.mode==="expert") s.push(STEP.assumptions);
   s.push(STEP.results);
   return s;
 }
@@ -121,13 +138,30 @@ function statusOf(key){
 }
 function monthsTo(dateStr){if(!dateStr)return null;var d=new Date(dateStr);if(isNaN(d))return null;var now=new Date();return (d.getFullYear()-now.getFullYear())*12+(d.getMonth()-now.getMonth());}
 
+/* ---------- terse labels for Expert mode (help text still shows) ---------- */
+var XLABEL={
+  rooms:"Rooms", ptype:"Type", branded:"Brand", mgmt:"Management", objective:"Objective",
+  noi:"NOI ($/yr)", noiBasis:"NOI nets mgmt fee + reserve?", totalRevenue:"Total revenue ($/yr)", margin:"NOI margin (%)",
+  occ:"Occupancy (%)", adr:"ADR ($)", noiTrend:"NOI trend", marketPosition:"RevPAR vs comp set",
+  loanBalance:"Loan balance ($)", monthlyPayment:"Monthly payment ($)", rate:"Rate (%)", floating:"Rate type",
+  rateCap:"Rate cap?", amort:"Amort (yrs)", interestOnly:"Interest-only?", maturity:"Maturity date",
+  prepayPenalty:"Prepay / defeasance ($)",
+  value:"Value ($)", capRate:"Cap rate (%)", mezzBalance:"Mezz / 2nd ($)", prefBalance:"Pref equity ($)",
+  mezzRate:"Mezz rate (%)", prefRate:"Pref return (%)", lenderType:"Lender type", recourse:"Recourse?",
+  guarantee:"Guaranty", guarantor:"Guarantor", otherGuarantees:"Completion/enviro guaranty?",
+  cashMgmt:"Lockbox / cash mgmt?", covenants:"Financial covenants?",
+  pip:"PIP ($)", deferred:"Deferred maint ($)", plannedReno:"Planned reno ($)", capexReserve:"Capex reserve ($)",
+  capexTiming:"Spend window (mo)", liquidity:"Injectable cash ($)",
+  targetDSCR:"Target DSCR", refiRate:"Refi rate (%)", refiAmort:"Refi amort (yrs)", minDebtYield:"Min debt yield (%)", maxLTV:"Max LTV (%)"
+};
+
 /* ---------- field component ---------- */
 function methodOptions(){return [{v:"exact",t:"Exact"},{v:"estimate",t:"Estimate"},{v:"range",t:"Range"},{v:"idk",t:"I don't know"},{v:"prefer",t:"Prefer not to say"}];}
 function renderField(key){
   var meta=FIELDS[key], cur=get(key);
   var wrap=el('<div class="field" data-key="'+key+'"></div>');
-  var lab=document.createElement("label");lab.textContent=meta.label;wrap.appendChild(lab);
-  if(meta.help && (S.mode==="beginner"||S.mode==="quick"||meta.alwaysHelp)){var h=el('<div class="help"></div>');h.textContent=meta.help;wrap.appendChild(h);}
+  var lab=document.createElement("label");lab.textContent=(S.mode==="expert"&&XLABEL[key])?XLABEL[key]:meta.label;wrap.appendChild(lab);
+  if(meta.help){var h=el('<div class="help"></div>');h.textContent=meta.help;wrap.appendChild(h);}
   var row=el('<div class="row"></div>');
 
   if(meta.kind==="select"){
@@ -280,6 +314,7 @@ function renderStep(){
   var steps=getSteps(), st=steps[S.step-1];
   if(!st){S.step=1;st=steps[0];}
   if(st.key==="results"){renderResults();return;}
+  if(st.key==="inputs"){renderExpertInputs();return;}
   app.innerHTML="";app.appendChild(renderStepper());
   var card=el('<div class="card"></div>');
   card.appendChild(el('<div class="section-h"><h2>'+st.title+'</h2></div>'));
@@ -302,6 +337,27 @@ function renderStep(){
   var next=el('<button class="btn primary">Continue →</button>');
   if(S.step===steps.length-1)next.textContent="See my diagnosis →";
   next.onclick=function(){S.step++;render();};
+  nav.appendChild(back);nav.appendChild(next);app.appendChild(nav);
+  syncTopbar();
+}
+/* Expert: one dense input page (all sections stacked, two-column, terse labels, help kept). */
+function renderExpertInputs(){
+  app.innerHTML="";app.appendChild(renderStepper());
+  app.appendChild(el('<div class="card"><div class="section-h"><h2>Inputs</h2></div><p class="section-sub">Fast entry — everything on one page. Skip anything you don’t have; ranges and “I don’t know” still work, and blanks just lower confidence. Refinance assumptions default to conservative ranges unless you override them.</p></div>'));
+  [["property","Property"],["operating","Performance"],["debt","Debt"],["stack","Structure & risk"],["capex","Capital & cash"],["distribution","Distribution"],["assumptions","Refinance assumptions"]].forEach(function(p){
+    var keys=fieldsForSection(p[0]); if(!keys.length) return;
+    var card=el('<div class="card"></div>');
+    card.appendChild(el('<div class="section-h"><h2 style="font-size:17px">'+p[1]+'</h2></div>'));
+    var grid=el('<div class="grid2"></div>');
+    keys.forEach(function(k){grid.appendChild(renderField(k));});
+    card.appendChild(grid);
+    app.appendChild(card);
+  });
+  app.appendChild(liveReadout());
+  app.appendChild(progressNote());
+  var nav=el('<div class="navbtns"></div>');
+  var back=el('<button class="btn ghost">← Home</button>');back.onclick=function(){S.step=0;render();};
+  var next=el('<button class="btn primary">See my diagnosis →</button>');next.onclick=function(){S.step=2;render();};
   nav.appendChild(back);nav.appendChild(next);app.appendChild(nav);
   syncTopbar();
 }
@@ -342,16 +398,22 @@ function compute(scenario){
   var assumptions=[];
   var noiR=resolveNOI(), noi=noiR.noi;
   var rev=valOf("totalRevenue"), occ=valOf("occ"), adr=valOf("adr"), rooms=valOf("rooms");
-  var flowThrough=DEF.flowThrough;
+  var ptype=get("ptype").value;
+  var fdef=FLOW_DEFAULTS[ptype]||FLOW_DEFAULTS._default;
+  var flowThrough=fdef.blended;
   // room revenue (for per-lever and distribution math); fall back to total revenue
   var roomRevenue=(adr!=null&&occ!=null&&rooms!=null)?adr*(occ/100)*rooms*365:(rev!=null?rev:null);
   // distribution inputs + actuals-derived per-lever flow-through
   var otaShare=valOf("otaShare"), otaComm=valOf("otaCommission"), directCost=valOf("directCost"), cpor=valOf("cpor");
-  var adrFlow=DEF.adrFlow, occFlow=DEF.occFlow, flowSrc="default";
+  var adrFlow=fdef.adr, occFlow=fdef.occ, flowSrc="default";
+  if(fdef!==FLOW_DEFAULTS._default) assumptions.push("Flow-through defaults adjusted for a "+ptype.toLowerCase()+" model (leaner cost base): blended "+flowThrough+"%, ADR "+adrFlow+"%, occupancy "+occFlow+"%.");
   var fa=E.flowThroughFromActuals({otaSharePct:otaShare,otaCommissionPct:otaComm,cpor:cpor,adr:adr});
   if(fa){flowSrc="actuals";adrFlow=fa.adrFlow;if(fa.occFlow!=null)occFlow=fa.occFlow;
     assumptions.push("Operating flow-through derived from your mix ("+otaShare+"% OTA at "+otaComm+"% commission"+(cpor!=null?(", $"+cpor+"/occupied room"):"")+"): ADR "+Math.round(adrFlow)+"%"+(fa.occFlow!=null?", occupancy "+Math.round(occFlow)+"%":" (occupancy uses default — add cost per occupied room)")+".");}
-  else assumptions.push("Operating flow-through uses defaults (ADR "+DEF.adrFlow+"%, occupancy "+DEF.occFlow+"%) — add OTA mix & commission to base this on your actuals.");
+  else assumptions.push("Operating flow-through uses "+(fdef!==FLOW_DEFAULTS._default?"type-based":"default")+" rates (ADR "+adrFlow+"%, occupancy "+occFlow+"%) — add OTA mix & commission to base this on your actuals.");
+  // NOI margin reasonableness (only when NOI was entered directly, not derived from a margin)
+  var impliedMargin=null, marginFlag=null;
+  if(noiR.src==="entered"&&rev!=null&&rev>0&&noiR.noi!=null){impliedMargin=noiR.noi/rev*100;var mb=MARGIN_BANDS[ptype]||MARGIN_BANDS._default;marginFlag={pct:impliedMargin,band:mb,status:impliedMargin<mb[0]?"low":impliedMargin>mb[1]?"high":"within"};}
   if(noi!=null&&scenario.applied){
     var addNOI=0;
     if(roomRevenue!=null){
@@ -390,7 +452,7 @@ function compute(scenario){
 
   var rnoObj=E.requiredNOIToRefinance({balance:bal,refiRatePct:rRate,amortYears:rAmort,targetDSCR:tDSCR,minDebtYieldPct:mdy});
   var reqNOItoRefi=rnoObj?rnoObj.value:null;
-  var lift=(noi!=null&&reqNOItoRefi!=null)?E.noiLiftTranslation({currentNOI:noi,targetNOI:reqNOItoRefi,rooms:rooms,occPct:occ,adr:adr,flowThroughPct:DEF.flowThrough,adrFlowPct:adrFlow,occFlowPct:occFlow}):null;
+  var lift=(noi!=null&&reqNOItoRefi!=null)?E.noiLiftTranslation({currentNOI:noi,targetNOI:reqNOItoRefi,rooms:rooms,occPct:occ,adr:adr,flowThroughPct:flowThrough,adrFlowPct:adrFlow,occFlowPct:occFlow}):null;
 
   var months=monthsTo(rawOf("maturity")), matRisk=E.maturityRisk(months);
   var capPress=E.capexPressure(capTotal,noi);
@@ -434,7 +496,8 @@ function compute(scenario){
     triage:tri,assumptions:assumptions,rooms:rooms,occ:occ,adr:adr,
     roomRevenue:roomRevenue,otaShare:otaShare,otaComm:otaComm,directCost:directCost,cpor:cpor,
     adrFlow:adrFlow,occFlow:occFlow,flowSrc:flowSrc,
-    stack:stack,exposure:exposure,lenderType:get("lenderType").value};
+    stack:stack,exposure:exposure,lenderType:get("lenderType").value,
+    ptype:ptype,impliedMargin:impliedMargin,marginFlag:marginFlag};
 }
 
 /* ---------- confidence ---------- */
@@ -656,6 +719,12 @@ function renderResults(){
 
   if(get("noiBasis").value==="No / not sure"&&m.noi!=null){
     app.appendChild(el('<div class="callout warn small"><strong>Heads up on your NOI.</strong> You indicated it may not already subtract a management fee and an FF&E reserve. Lenders will. If it doesn’t, your true NOI — and every number below — is likely 5–8% lower than shown. Consider deducting ~3% management fee and ~4% reserve.</div>'));
+  }
+  if(m.marginFlag&&m.marginFlag.status!=="within"){
+    var mf=m.marginFlag, msg;
+    if(mf.status==="low") msg="Your implied NOI margin is "+fmtPct(mf.pct,0)+", below the typical "+mf.band[0]+"–"+mf.band[1]+"% for "+(m.ptype||"this property type").toLowerCase()+". That can signal real cost pressure — or an NOI figure that’s missing something. Worth a close look at the expense lines.";
+    else msg="Your implied NOI margin is "+fmtPct(mf.pct,0)+", above the typical "+mf.band[0]+"–"+mf.band[1]+"% for "+(m.ptype||"this property type").toLowerCase()+"."+(m.ptype==="Self-check-in / no front desk"?" For a self-check-in / no-front-desk model that lean margin is expected.":" Double-check the NOI isn’t overstated — e.g., missing a management fee or FF&E reserve.");
+    app.appendChild(el('<div class="callout warn small"><strong>NOI margin check.</strong> '+msg+'</div>'));
   }
 
   var metric=function(lab,val,sub,tone){return '<div class="metric"><div class="lab">'+lab+'</div><div class="val"'+(tone?' style="color:var(--'+tone+')"':'')+'>'+val+'</div>'+(sub?'<div class="sub '+(tone?'':'muted')+'"'+(tone?' style="color:var(--'+tone+')"':'')+'>'+sub+'</div>':'')+'</div>';};
