@@ -705,6 +705,63 @@ function renderStackRisk(m){
   return card;
 }
 
+/* ---------- time-phased action roadmap (the "what should I do, in what order" layer) ---------- */
+function buildRoadmap(m){
+  var now=[],near=[],mat=[],lng=[];
+  var pl=opsPlausibility(m), gap=m.refiGap, liq=m.liquidity, conf=overallConfidence();
+
+  // NOW (this week)
+  if(conf.pct<70) now.push({a:"Pin down your real numbers",w:"Pull your latest loan statement, T-12 P&L, and loan agreement so this read is lender-grade, not directional.",who:"Bookkeeper / CPA",prep:"Loan statement, T-12, loan agreement"});
+  if(m.dscr!=null&&m.dscr<1.0) now.push({a:"Protect cash and call your lender before you miss a payment",w:"NOI isn’t covering debt service today. Lenders respond far better to an early, proactive call than to a missed payment.",who:"You + lender (attorney if recourse)"});
+  if(m.months!=null&&m.months<=6) now.push({a:"Open the maturity conversation immediately",w:"Maturity is within ~6 months, so time is the binding constraint. Ask what an extension would require.",who:"Lender; consider a mortgage broker"});
+  if(m.exposure&&m.exposure.severity>=55) now.push({a:"Understand your personal exposure before you act",w:"You appear personally on the hook — know what’s at risk and which moves could trip guaranty carve-outs.",who:"Real-estate attorney"});
+  if(get("cashMgmt").value==="Yes"&&m.dscr!=null&&m.dscr<1.25) now.push({a:"Check your cash-trap headroom",w:"With a lockbox and thin coverage, a sweep could divert your cash — confirm the trigger level and your distance from it.",who:"Loan servicer"});
+  if(!now.length) now.push({a:"Bank the good news, then stress-test it",w:"Coverage looks okay today — use the scenario tools to see how a rate move, capex, or maturity could change that."});
+
+  // NEXT 30–90 DAYS
+  if(pl&&(pl.tone==="good"||pl.tone==="ok")) near.push({a:"Build a 90-day commercial plan to lift NOI",w:"Operations can realistically move the number"+(m.noiLift?" (target ~"+fmtMoney(m.noiLift.noiLift)+")":"")+" through rate, channel mix, and cost — and shifting bookings to direct cuts commission straight to NOI.",who:"Revenue management / MHS",prep:"STR report, channel mix, rate calendar"});
+  if(gap!=null&&gap>0){
+    if(liq!=null&&liq>=gap) near.push({a:"Model a principal paydown to close the gap",w:"Your indicated cash (~"+fmtMoney(liq)+") looks sufficient to bridge the ~"+fmtMoney(gap)+" shortfall and unlock better refinance terms.",who:"Lender / CPA"});
+    else near.push({a:"Start conversations with capital sources",w:"The ~"+fmtMoney(gap)+" gap looks larger than your available cash, so plan for outside capital (preferred or JV equity) or a partial paydown plus an NOI lift.",who:"Capital advisor / broker"});
+  }
+  near.push({a:"Assemble your lender package",w:"Get ahead of any ask with a clean story rather than a scramble later.",prep:"T-12, debt schedule, 12-month forecast, capex plan, market narrative"});
+  if(m.capexPressure&&(m.capexPressure.score==="High"||m.capexPressure.score==="Medium")) near.push({a:"Firm up your PIP / capex scope and timing",w:"Get real bids and negotiate timing or phasing with the brand so capital needs don’t collide with debt service.",who:"Brand / general contractor"});
+  if(m.floating) near.push({a:"Price interest-rate protection",w:"You’re floating — get quotes on a rate cap so a further rate move doesn’t quietly erode coverage."});
+
+  // BEFORE MATURITY
+  if(m.months!=null){
+    mat.push({a:"Re-test refinance readiness 6–9 months out",w:"Re-run this diagnostic once the NOI plan has traction to see whether the gap has actually closed."});
+    mat.push({a:"Validate value and solicit quotes early",w:"Get an appraisal or broker opinion of value and test refinance quotes — don’t wait until you’re forced to transact.",who:"Appraiser / mortgage broker"});
+    mat.push({a:"Decide the path: refinance, extend, recapitalize, or sell",w:"Choose based on whether NOI and value support the balance. If a gap persists, line up equity or negotiate an extension; if it’s too large, a planned sale can beat a forced refinance.",who:"Lender / broker / capital advisor"});
+  } else {
+    mat.push({a:"Find and confirm your maturity date",w:"It drives all the timing — locate it in your loan agreement and set reminders 12 and 6 months out.",prep:"Loan agreement"});
+  }
+
+  // LONG TERM
+  lng.push({a:"Right-size the stack for the next cycle",w:"Target a leverage and DSCR cushion you can live with, and decide fixed-vs-floating and term length deliberately rather than by default."});
+  lng.push({a:"Keep NOI ‘lender-clean’",w:"Fund an FF&E reserve and book a management fee so your NOI is the number a lender will actually underwrite."});
+  if(m.exposure&&m.exposure.severity>=55) lng.push({a:"Work toward less personal exposure",w:"As coverage and value improve, push for non-recourse or a smaller guaranty at the next financing."});
+  lng.push({a:"Institutionalize revenue management and direct bookings",w:"Protecting margin and owning more of your demand is the most durable way to keep the stack refinanceable."});
+
+  return {now:now,near:near,mat:mat,lng:lng};
+}
+function renderRoadmap(m){
+  var r=buildRoadmap(m);
+  var card=el('<div class="card"></div>');
+  card.appendChild(el('<div class="section-h"><h2>Your action roadmap</h2></div>'));
+  card.appendChild(el('<p class="section-sub">A sequence, not a to-do dump — what to do now, next, before your loan comes due, and for the long term. Tailored to the issues above.</p>'));
+  [["Now (this week)","now"],["Next 30–90 days","near"],["Before maturity","mat"],["Long term","lng"]].forEach(function(h){
+    var items=r[h[1]]; if(!items||!items.length) return;
+    card.appendChild(el('<h3 style="font-size:15px;color:var(--navy);margin:14px 0 6px">'+h[0]+'</h3>'));
+    items.forEach(function(it){
+      var meta=[]; if(it.who)meta.push("Who: "+it.who); if(it.prep)meta.push("Bring: "+it.prep);
+      card.appendChild(el('<div class="flagrow" style="align-items:flex-start"><span class="dot ok" style="width:8px;height:8px;border-radius:50%;margin-top:6px;flex:0 0 auto"></span><div><strong>'+it.a+'</strong> <span class="muted">— '+it.w+'</span>'+(meta.length?'<div class="small muted" style="margin-top:2px">'+meta.join(" · ")+'</div>':'')+'</div></div>'));
+    });
+  });
+  card.appendChild(el('<p class="small muted" style="margin-top:10px">A planning sequence, not financial or legal advice. Pressure-test it with your lender, CPA, attorney, or capital advisor before acting.</p>'));
+  return card;
+}
+
 /* ---------- RESULTS ---------- */
 var scenarioState={applied:false,adrPct:0,occPct:0,expenseCut:0,shiftToDirect:0,commissionCut:0,refiRate:DEF.refiRateMid,io:false,equity:0};
 function renderResults(){
@@ -790,6 +847,9 @@ function renderResults(){
   // capital stack & risk detail (shown only when there's structure/exposure context)
   var stackCard=renderStackRisk(m);
   if(stackCard) app.appendChild(stackCard);
+
+  // time-phased action roadmap (the synthesis: what to do, in what order)
+  app.appendChild(renderRoadmap(m));
 
   // fixes
   var fixes=el('<div class="card"></div>');
@@ -960,7 +1020,15 @@ function memoHTML(m){
   '<h2 style="color:#0e2a3b">4. Capital needs</h2><p>Identified capital need '+fmtMoney(m.capexTotal)+' ('+m.capexPressure.score+' pressure). Net of reserves: '+fmtMoney(m.capexNet)+'.'+(m.liquidity!=null?(' Owner indicates ~'+fmtMoney(m.liquidity)+' of injectable cash.'):'')+'</p>'+
   '<h2 style="color:#0e2a3b">5. Refinance readiness</h2><table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px">'+row("Supportable new debt",m.supportable.loan!=null?fmtMoney(m.supportable.loan):"—")+(g?row("Total needed at maturity (incl. capex & costs)",fmtMoney(g.uses)):"")+row("Refinance gap",m.refiGap!=null?fmtMoney(m.refiGap)+(m.refiGap>0?" (shortfall)":" (surplus)"):"—")+row("Required NOI to refinance",fmtMoney(m.requiredNOItoRefi))+'</table>'+
   (nl?('<h2 style="color:#0e2a3b">6. Operational fix potential</h2><p>To support the current balance, NOI would need to rise by <strong>'+fmtMoney(nl.noiLift)+'</strong> — roughly '+fmtMoney(nl.annualRevenueIncrease)+' of incremental revenue'+(nl.adrIncreaseAtCurrentOcc!=null?(', equivalent to +'+fmtMoney(nl.adrIncreaseAtCurrentOcc)+' ADR at current occupancy'):"")+(nl.occPointIncreaseAtCurrentADR!=null?(', or +'+fmtPct(nl.occPointIncreaseAtCurrentADR,1)+' occupancy points at current ADR'):"")+'.'+(pl?(' <strong>'+pl.verdict+'</strong>'):'')+'</p>'):"")+
-  '<h2 style="color:#0e2a3b">7. Recommended next steps</h2><ul>'+opts+'</ul>'+
+  (function(){
+    var rm=buildRoadmap(m);
+    function L(items){return items.map(function(it){return '<li><strong>'+it.a+'</strong> — '+it.w+(it.who?(' <em>('+it.who+')</em>'):'')+'</li>';}).join("");}
+    return '<h2 style="color:#0e2a3b">7. Action roadmap</h2>'+
+      '<p style="font-size:14px;margin:6px 0 2px"><strong>Now:</strong></p><ul style="font-size:14px">'+L(rm.now)+'</ul>'+
+      '<p style="font-size:14px;margin:6px 0 2px"><strong>Next 30–90 days:</strong></p><ul style="font-size:14px">'+L(rm.near)+'</ul>'+
+      '<p style="font-size:14px;margin:6px 0 2px"><strong>Before maturity:</strong></p><ul style="font-size:14px">'+L(rm.mat)+'</ul>'+
+      '<p style="font-size:14px;margin:6px 0 2px"><strong>Long term:</strong></p><ul style="font-size:14px">'+L(rm.lng)+'</ul>';
+  })()+
   '<h2 style="color:#0e2a3b">8. What would improve this analysis</h2><p style="font-size:14px">Confirm loan balance, maturity date, T-12 NOI, and PIP requirement. For a lender-ready package: full T-12, debt schedule, capex plan, appraisal, and borrower liquidity.</p>'+
   (function(){var parts="";
     if(m.stack&&m.stack.value!=null){parts+='<p>Capital stack at an estimated value of '+fmtMoney(m.stack.value)+': '+(m.stack.sponsorStatus==="wiped"?'common equity is underwater (debt/pref exceed value).':'value can fall ~'+Math.round(m.stack.equityCushionPct)+'% before equity is wiped.')+' '+m.stack.layers.map(function(l){return l.name+' '+l.status;}).join('; ')+'.</p>';}

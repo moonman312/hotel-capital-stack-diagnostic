@@ -120,6 +120,12 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const flowAdj = /Flow-through defaults adjusted/i.test(document.body.textContent);
     flowAdj ? pass("type-based flow-through defaults applied (self-check-in)") : fail("type-based flow-through note");
 
+    // time-phased action roadmap with all four horizons
+    const roadmapHdr = Array.from(document.querySelectorAll(".section-h h2")).some(h=>/action roadmap/i.test(h.textContent));
+    const horizons = Array.from(document.querySelectorAll("h3")).map(h=>h.textContent);
+    const allHorizons = ["Now (this week)","Next 30–90 days","Before maturity","Long term"].every(t=>horizons.includes(t));
+    roadmapHdr && allHorizons ? pass("action roadmap renders with all four horizons") : fail("action roadmap", horizons.join("|"));
+
     // Cash-after-debt metric present (plain dollars, /yr)
     const metricVals = Array.from(document.querySelectorAll(".metric .val")).map(v=>v.textContent);
     metricVals.some(v=>/\/yr/.test(v)) ? pass("cash-after-debt metric shown: "+metricVals[0]) : fail("cash metric", metricVals.join("|"));
